@@ -1,11 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: gbk -*-
-
-# 目前的最大问题：存储的评论数量似乎不对
-# 爬取速度好慢，Pool分布式
-# 动态cookie? 412错误重出江湖
-
-
 import requests
 from requests.exceptions import ReadTimeout, ConnectionError, RequestException
 import json
@@ -16,16 +9,11 @@ import time
 import random
 
 
-# response = requests.get('https://www.bilibili.com')
-# print(response.cookies)
-# for key,value in response.cookies.items():
-#     print(key,'==',value)
+def get_user_agent():
+    """
+    Get random user headers
+    """
 
-def GetUserAgent():
-    '''
-    功能：随机获取HTTP_User_Agent
-    function: get random User Agent headers
-    '''
     user_agents = [
         "Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1; SV1; AcooBrowser; .NET CLR 1.1.4322; .NET CLR 2.0.50727)",
         "Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 6.0; Acoo Browser; SLCC1; .NET CLR 2.0.50727; Media Center PC 5.0; .NET CLR 3.0.04506)",
@@ -67,9 +55,11 @@ def GetUserAgent():
 
 
 def random_ip():
-    '''
-        function: get random ip
-    '''
+    """
+    Get ip randomly
+
+    :return: proxy
+    """
 
     http_proxies = ['70.169.141.35:3128', '47.89.153.213:80', '3.95.126.46:80', '3.216.45.64:80', '104.211.29.96:80',
                     '92.204.129.161:80', '134.122.113.7:8080', '191.252.61.219:3128', '198.13.55.233:3128',
@@ -83,9 +73,13 @@ def random_ip():
 
 def fetch_secondary_data(avid, rpid, word):
     """
-    Fetch secondary data from rpid
-
+    get relative secodary_comments according to a particular rpid value.
+    :param avid: av ID
+    :param rpid: a unique code that looks up a piece of primary_comment
+    :param word: a keyword that helps us know the video belongs to which type of samples
+    :return: a secondary list
     """
+
     target2 = f'https://api.bilibili.com/x/v2/reply/reply?&type=1&oid={avid}&root={rpid}'
     headers = {
         'User-Agent': GetUserAgent(),
@@ -101,7 +95,6 @@ def fetch_secondary_data(avid, rpid, word):
                 print(f'Error! Position 3.Type {req.status_code}')
                 time.sleep(random.choice(quick))
                 if req.status_code == 412:
-                    # print(target2)
                     time.sleep(random.choice(slow))
                 continue
             break
@@ -111,7 +104,7 @@ def fetch_secondary_data(avid, rpid, word):
             print('Connection error')
         except RequestException:
             print('Error')
-        except:
+        except OtherType:
             print('Error!Type 3. Trying to reconnect……')
             time.sleep(random.choice(quick))
             continue
@@ -125,7 +118,6 @@ def fetch_secondary_data(avid, rpid, word):
 
     for page_num in range(1, page + 1):
         # for page_num in range(1, 2):
-
         target = f'https://api.bilibili.com/x/v2/reply/reply?&type=1&oid={avid}&root={rpid}&pn={page_num}&ps=49'
 
         while True:
@@ -143,7 +135,7 @@ def fetch_secondary_data(avid, rpid, word):
                 print('Connection error')
             except RequestException:
                 print('Error')
-            except:
+            except OtherType:
                 print('Error!Type 4. Trying to reconnect……')
                 time.sleep(random.choice(quick))
                 continue
@@ -160,8 +152,6 @@ def fetch_secondary_data(avid, rpid, word):
                 like = reply['like']
                 rcount = reply['rcount']
 
-                # print(f"\t\t{mid},{uname},{sex},{msg},{like},{rcount}")
-
                 rows1.append([avid, word, mid, uname, sex, msg, like, rcount])
 
     return rows1
@@ -172,7 +162,7 @@ def fetch_data(word, avid):
 
     Args:
         avid (str): target av ID
-        page_num (str): target page number
+        word: sample ID
     """
     target1 = f'https://api.bilibili.com/x/v2/reply?&type=1&oid={avid}&sort=1'
     headers = {
@@ -198,7 +188,7 @@ def fetch_data(word, avid):
             print('Connection error')
         except RequestException:
             print('Error')
-        except:
+        except OtherType:
             print('Error!Type 1. Trying to reconnect……')
             time.sleep(random.choice(quick))
             continue
@@ -209,13 +199,11 @@ def fetch_data(word, avid):
     num = page_info['acount']  # all Comment count of an item
     print(f"Total comment count:{num}")  # display the comment counts
     page = math.ceil(page_info['count'] / 49)
-    # print(f'Total page_num is {page}')  # compute the total page_num
 
     primary_comments = []
     secondary_comments = []
 
     for page_num in range(1, page + 1):
-        # for page_num in range(1, 3):
         print(f'Current page_num:{page_num}')
         target = f'https://api.bilibili.com/x/v2/reply?&type=1&oid={avid}&sort=1&pn={page_num}&ps=49'
 
@@ -235,7 +223,7 @@ def fetch_data(word, avid):
                 print('Connection error')
             except RequestException:
                 print('Error')
-            except:
+            except OtherType:
                 print('Error!Type 2. Trying to reconnect……')
                 time.sleep(random.choice(quick))
                 continue
@@ -252,7 +240,6 @@ def fetch_data(word, avid):
             like = reply['like']
             rcount = reply['rcount']
 
-            # print(f"{mid},{uname},{sex},{msg},{like},{rcount}")
             primary_comments.append([avid, word, mid, uname, sex, msg, like, rcount])
             secondary_comments += fetch_secondary_data(avid, rpid, word)
 
@@ -261,41 +248,33 @@ def fetch_data(word, avid):
 
 def store_data(contents, avid):
     """
-    Store data fetched as proper format: Convert lists to a Dataframe and save it as CSV
-
+    convert the list to a dataframe and save it as a CSV file
+    :param contents: the comments fetched
+    :param avid: video ID
+    :return: a CSV file
     """
     df = pd.DataFrame(contents)
     df.columns = ['key', 'avid', 'account_number', 'account_name', 'sex', 'comments_content', 'like',
                   'rcount']
-    # print(df)
 
     df.to_csv(f'D:/content/{avid}.csv', index=False, encoding='utf_8_sig')
-    # df.to_csv('D:/test1.csv',index=False)
-
 
 def main():
-    # Fill your av ID list here
     file = pd.read_excel('D:/lda.xlsx', sheet_name=1)
-    file = file[32:42]
-    avlist = list(file['id'].values)
+    # file = file[32:42]
+    av_list = list(file['id'].values)
 
-    for avid in avlist:
+    for avid in av_list:
         contents = []
         word1 = file.iloc[np.where(file.id.values == avid)]
         word = word1['key'].values
-        # word = df[df.id == avid] the result is the same as the above
         print(f'Current av ID: {word},{avid}')
 
-        # get the key's value
         contents += fetch_data(word, avid)
 
         print(
             f"Congratulations! {len(contents)} comments of video {avid} have been scraped! You are so capable a girl ! (NO, it's the crawler lol.)")
-        # print(contents)
         store_data(contents, avid)
-
-    # result = contents
-    # contents = [word + c for c in contents]
 
 
 main()
