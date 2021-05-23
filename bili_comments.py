@@ -269,14 +269,14 @@ def store_data(contents, avid):
                   'rcount']
     # print(df)
 
-    df.to_csv(f'D:/{avid}.csv', index=False, encoding='utf_8_sig')
+    df.to_csv(f'D:/content/{avid}.csv', index=False, encoding='utf_8_sig')
     # df.to_csv('D:/test1.csv',index=False)
 
 
 def main():
     # Fill your av ID list here
     file = pd.read_excel('D:/lda.xlsx', sheet_name=1)
-    file = file[4:]
+    file = file[32:42]
     avlist = list(file['id'].values)
 
     for avid in avlist:
